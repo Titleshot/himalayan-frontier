@@ -24,7 +24,7 @@ function paintSaved(){
   const n=saved.length,c=$('#mCount');if(c){c.hidden=!n;c.textContent=n;}
   const box=$('#mSaved');if(!box)return;box.hidden=!n;
   const L=saved.map(id=>S.tripById&&S.tripById(id)).filter(Boolean);
-  $('#mSavedList').innerHTML=L.map(t=>`<div class="msi"><button type="button" class="mso" data-id="${t.id}"><img src="${esc(t.img)}" alt="" loading="lazy"><span><b>${esc(t.name)}</b><small>${esc(t.dur)} · from US$${fmt(t.price)}</small></span></button><button type="button" class="msx" data-rm="${t.id}" aria-label="Remove ${esc(t.name)}">×</button></div>`).join('');
+  $('#mSavedList').innerHTML=L.map(t=>`<div class="msi"><button type="button" class="mso" data-id="${t.id}"><img src="${esc(t.th||t.img)}" alt="" loading="lazy"><span><b>${esc(t.name)}</b><small>${esc(t.dur)} · from US$${fmt(t.price)}</small></span></button><button type="button" class="msx" data-rm="${t.id}" aria-label="Remove ${esc(t.name)}">×</button></div>`).join('');
 }
 S.toggleSave=id=>{const i=saved.indexOf(id);if(i>=0)saved.splice(i,1);else saved.push(id);store.set('hf-saved',saved);paintSaved();
   const t=S.tripById&&S.tripById(id);toast(i>=0?'Removed from your saved trips':`Saved${t?': '+t.name:''}. Find it in the menu.`);};

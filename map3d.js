@@ -60,15 +60,16 @@ const terrainMat=new THREE.ShaderMaterial({
   }`});
 
 /* ------------ region loading ------------ */
-const regions={},R_hd={};const wantHD=n=>{if(narrow()||S.LITE||!R_hd[n])return;const f=R_hd[n];R_hd[n]=null;setTimeout(f,1500);};
+const regions={},R_hd={},MS=narrow()?'-m':''; // phones get lighter terrain files
+const wantHD=n=>{if(narrow()||S.LITE||!R_hd[n])return;const f=R_hd[n];R_hd[n]=null;setTimeout(f,1500);};
 const texLoader=new THREE.TextureLoader();
 const loadTex=url=>new Promise((res,rej)=>texLoader.load(url,res,undefined,rej));
 async function loadRegion(name){
   if(regions[name]) return regions[name];
   const [j,blob,tex,nrm]=await Promise.all([
     fetch(`assets/geo/${name}.json`).then(r=>r.json()),
-    fetch(`assets/geo/${name}-dem.png`).then(r=>r.blob()),
-    loadTex(`assets/geo/${name}-tex.jpg`),loadTex(`assets/geo/${name}-nrm.jpg`)
+    fetch(`assets/geo/${name}-dem${MS}.png`).then(r=>r.blob()),
+    loadTex(`assets/geo/${name}-tex${MS}.jpg`),loadTex(`assets/geo/${name}-nrm${MS}.jpg`)
   ]);
   const bmp=await createImageBitmap(blob,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
   const cv=document.createElement('canvas');cv.width=bmp.width;cv.height=bmp.height;
@@ -83,7 +84,7 @@ async function loadRegion(name){
   R.h=(x,z)=>{const fx=clamp((x/R.KX+.5)*(W-1),0,W-1.001),fz=clamp((z/R.KZ+.5)*(H-1),0,H-1.001);const x0=fx|0,z0=fz|0,a=fx-x0,b=fz-z0,i=z0*W+x0;
     return dem[i]*(1-a)*(1-b)+dem[i+1]*a*(1-b)+dem[i+W]*(1-a)*b+dem[i+W+1]*a*b;};
   R.y=(x,z)=>R.h(x,z)/1000*EX;
-  const step=narrow()?2:1, sx=Math.floor((W-1)/step), sz=Math.floor((H-1)/step);
+  const step=1, sx=Math.floor((W-1)/step), sz=Math.floor((H-1)/step);
   const g=new THREE.PlaneGeometry(R.KX,R.KZ,sx,sz);g.rotateX(-Math.PI/2);
   const pos=g.attributes.position;
   for(let k=0;k<pos.count;k++)pos.setY(k,R.y(pos.getX(k),pos.getZ(k)));
@@ -403,7 +404,7 @@ document.addEventListener('hf:select',e=>{
   else if(req)doScroll(req);
 });
 /* the terrain is several megabytes: fetch it only when the reader gets near the explorer */
-new IntersectionObserver((es,o)=>{if(es.some(e=>e.isIntersecting)){near=true;o.disconnect();if(S.data&&!TK)showTrek(S.trek);}},{rootMargin:'900px 0px'}).observe(exSec);
+new IntersectionObserver((es,o)=>{if(es.some(e=>e.isIntersecting)){near=true;o.disconnect();if(S.data&&!TK)showTrek(S.trek);}},{rootMargin:narrow()?'400px 0px':'900px 0px'}).observe(exSec);
 document.addEventListener('hf:data',()=>{if(!TK&&near)showTrek(S.trek);});
 if(S.data&&!TK&&near)showTrek(S.trek);
 

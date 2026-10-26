@@ -1070,3 +1070,6 @@ html.menu-open .alt,html.pre-on .alt{opacity:0}
 .ntip .trow i{width:8px;height:8px;border-radius:50%}
 .ntip .trow span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ntip .trow em{font:400 11.5px var(--mono);font-style:normal;color:var(--soft)}
+
+/* iPhone Safari pauses films it considers invisible, so the hidden sources stay (barely) on screen */
+.reel-src,.rp-src{left:0;bottom:0;width:2px;height:2px;opacity:.01}

@@ -67,7 +67,7 @@ function marquee(){
   whenCat(()=>{
     const L=MARQ.map(id=>S.tripById(id)).filter(Boolean),half=Math.ceil(L.length/2);
     [L.slice(0,half),L.slice(half)].forEach((set,r)=>{
-      const tile=c=>`<button type="button" class="mtile" data-trip="${c.id}"><img src="${esc(c.img)}" alt="" loading="lazy" decoding="async"><span>${esc(c.name)}</span></button>`;
+      const tile=c=>`<button type="button" class="mtile" data-trip="${c.id}"><img src="${esc(c.th||c.img)}" alt="" loading="lazy" decoding="async"><span>${esc(c.name)}</span></button>`;
       rows[r].innerHTML=[0,1,2].map(()=>set.map(tile).join('')).join('');
       // copies after the first are decoration for the loop: keep them out of the tab order
       [...rows[r].children].forEach((b,i)=>{if(i>=set.length){b.tabIndex=-1;b.setAttribute('aria-hidden','true');}});
@@ -222,7 +222,7 @@ function sphere(){
   const pl=32;
   whenCat(()=>{
     const seen=new Set(),L=SPH.map(id=>S.tripById(id)).filter(Boolean).concat(S.cat).filter(c=>c&&c.img&&!seen.has(c.img)&&seen.add(c.img)).slice(0,innerWidth<=640?34:42),N=L.length,GA=Math.PI*(3-Math.sqrt(5));
-    orb.innerHTML=L.map((c,i)=>`<button type="button" class="sc" data-trip="${c.id}" aria-label="${esc(c.name)}"><figure><img src="${esc(c.img)}" alt="" loading="lazy" decoding="async"><figcaption>${esc(c.name)}</figcaption></figure></button>`).join('');
+    orb.innerHTML=L.map((c,i)=>`<button type="button" class="sc" data-trip="${c.id}" aria-label="${esc(c.name)}"><figure><img src="${esc(c.th||c.img)}" alt="" loading="lazy" decoding="async"><figcaption>${esc(c.name)}</figcaption></figure></button>`).join('');
     cards=$$('.sc',orb).map((el,i)=>{const y=1-(i/(N-1))*2,rad=Math.sqrt(Math.max(0,1-y*y)),th=i*GA,x=Math.cos(th)*rad,z=Math.sin(th)*rad;
       return {el,x,y,z,lat:Math.asin(y)*180/Math.PI,lon:Math.atan2(x,z)*180/Math.PI,o:-1,d:-1};});
     layout();
@@ -275,7 +275,7 @@ const REEL=[['te-ebc-14','Everest Base Camp'],['te-gokyo-ri-15','Gokyo Lakes'],[
   ['exp-ama-dablam','Ama Dablam'],['pc-island-peak','Island Peak'],['heli-everest','Everest by helicopter'],['tibet-ebc','Tibet north face'],['bhutan-classic','Tiger’s Nest, Bhutan']];
 function reel(){
   const band=$('#reelBand');if(!band)return;
-  const cv=$('#reelCanvas'),ctx=cv.getContext('2d'),vid=$('#reelVid'),poster=new Image();poster.src='assets/vr/reel.webp';
+  const cv=$('#reelCanvas'),ctx=cv.getContext('2d'),vid=$('#reelVid'),poster=new Image();
   let W=0,H=0,u=1,mob=false,visible=false,off=0,vel=0,last=performance.now(),drag=null,paths=[],srcSet=false;
   const PITCH=196,LOOP=PITCH*REEL.length;
   function resize(){W=band.clientWidth;mob=W<=820;u=W/(mob?640:1440);H=Math.round(440*u);band.style.height=H+'px';const d=Math.min(devicePixelRatio||1,mob?1.5:2);cv.width=W*d;cv.height=H*d;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(d,0,0,d,0,0);}
@@ -338,7 +338,7 @@ function reel(){
   cursorFor(cv,'Drag');
   new ResizeObserver(resize).observe(band);resize();
   onView(band,v=>{visible=v;
-    if(v){if(!srcSet&&AUTO){srcSet=true;vid.src=small()?'assets/vr/reel-m.mp4':'assets/vr/reel.mp4';}if(AUTO)vid.play().catch(()=>{});last=performance.now();requestAnimationFrame(frame);}
+    if(v){if(!poster.src)poster.src='assets/vr/reel.webp';if(!srcSet&&AUTO){srcSet=true;vid.src=small()?'assets/vr/reel-m.mp4':'assets/vr/reel.mp4';}if(AUTO)vid.play().catch(()=>{});last=performance.now();requestAnimationFrame(frame);}
     else vid.pause();},'150px');
 }
 
@@ -397,7 +397,7 @@ function menu(){
   const q=$('#mSearch'),out=$('#mResults');
   q.addEventListener('input',()=>{const v=q.value.trim().toLowerCase();if(!v||!S.cat){out.innerHTML='';return;}
     const L=S.cat.filter(c=>(c.name+' '+c.region+' '+c.type).toLowerCase().includes(v)).slice(0,6);
-    out.innerHTML=L.length?L.map(c=>`<button type="button" data-id="${c.id}"><img src="${esc(c.img)}" alt="" loading="lazy"><span><b>${esc(c.name)}</b><small>${esc(c.region)} · ${esc(c.dur)} · from US$${fmt(c.price)}</small></span></button>`).join(''):'<p>No trips match. Try a region such as Everest, Annapurna or Mustang.</p>';});
+    out.innerHTML=L.length?L.map(c=>`<button type="button" data-id="${c.id}"><img src="${esc(c.th||c.img)}" alt="" loading="lazy"><span><b>${esc(c.name)}</b><small>${esc(c.region)} · ${esc(c.dur)} · from US$${fmt(c.price)}</small></span></button>`).join(''):'<p>No trips match. Try a region such as Everest, Annapurna or Mustang.</p>';});
   out.addEventListener('click',e=>{const b=e.target.closest('[data-id]');if(!b)return;open(false);setTimeout(()=>S.openTrip(b.dataset.id),reduce?0:250);});
   // back to top
   const tt=$('#toTop');let shown=false;

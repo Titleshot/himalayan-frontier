@@ -73,7 +73,7 @@ let M=null,ROUTES={};
 const loader=new THREE.TextureLoader();
 const tex=u=>new Promise((res,rej)=>loader.load(u,res,undefined,rej));
 async function load(){
-  const [j,blob,t,n,rts]=await Promise.all([fetch('assets/geo/nepal.json').then(r=>r.json()),fetch('assets/geo/nepal-dem.png').then(r=>r.blob()),tex('assets/geo/nepal-tex-lo.jpg'),tex('assets/geo/nepal-nrm.jpg'),fetch('assets/geo/routes.json').then(r=>r.json()).catch(()=>({}))]);
+  const [j,blob,t,n,rts]=await Promise.all([fetch('assets/geo/nepal.json').then(r=>r.json()),fetch('assets/geo/nepal-dem-m.png').then(r=>r.blob()),tex('assets/geo/nepal-tex-m.jpg'),tex(`assets/geo/nepal-nrm${narrow()?'-m':''}.jpg`),fetch('assets/geo/routes.json').then(r=>r.json()).catch(()=>({}))]);
   ROUTES=rts;
   const bmp=await createImageBitmap(blob,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
   const cv=document.createElement('canvas');cv.width=bmp.width;cv.height=bmp.height;const cx=cv.getContext('2d',{willReadFrequently:true});cx.drawImage(bmp,0,0);
@@ -85,7 +85,7 @@ async function load(){
   M={W,H,dem,KX,KZ,b};
   M.h=(x,z)=>{const fx=clamp((x/KX+.5)*(W-1),0,W-1.001),fz=clamp((z/KZ+.5)*(H-1),0,H-1.001),x0=fx|0,z0=fz|0,a=fx-x0,c=fz-z0,i=z0*W+x0;return (dem[i]*(1-a)*(1-c)+dem[i+1]*a*(1-c)+dem[i+W]*(1-a)*c+dem[i+W+1]*a*c)/1000*EX*SC;};
   M.xz=(lat,lon)=>[((lon-b.lonW)/(b.lonE-b.lonW)-.5)*KX,((b.latN-lat)/(b.latN-b.latS)-.5)*KZ];
-  const step=narrow()?3:2,g=new THREE.PlaneGeometry(KX,KZ,Math.floor((W-1)/step),Math.floor((H-1)/step));g.rotateX(-Math.PI/2);
+  const step=narrow()?(W-1)/511:1,g=new THREE.PlaneGeometry(KX,KZ,Math.floor((W-1)/step),Math.floor((H-1)/step));g.rotateX(-Math.PI/2);
   const pos=g.attributes.position;for(let k=0;k<pos.count;k++)pos.setY(k,M.h(pos.getX(k),pos.getZ(k)));g.computeVertexNormals();
   // height of the rendered (decimated) surface, so lines sit on what you see instead of sinking into it
   const gx=Math.floor((W-1)/step),gz=Math.floor((H-1)/step);
@@ -102,14 +102,14 @@ async function load(){
 /* ---------- high-detail patches: real 30 m terrain and 10 m imagery for the featured regions ---------- */
 const PATCHES=['khumbu','annapurna','manaslu','langtang'];let patchesStarted=false;
 async function loadPatch(name,slot){
-  const [j,blob,t,n]=await Promise.all([fetch(`assets/geo/${name}.json`).then(r=>r.json()),fetch(`assets/geo/${name}-dem.png`).then(r=>r.blob()),
-    tex(`assets/geo/${name}-tex${narrow()?'':'-hd'}.jpg`),tex(`assets/geo/${name}-nrm.jpg`)]);
+  const [j,blob,t,n]=await Promise.all([fetch(`assets/geo/${name}.json`).then(r=>r.json()),fetch(`assets/geo/${name}-dem-m.png`).then(r=>r.blob()),
+    tex(`assets/geo/${name}-tex.jpg`),tex(`assets/geo/${name}-nrm-m.jpg`)]);
   const bmp=await createImageBitmap(blob,{colorSpaceConversion:'none',premultiplyAlpha:'none'});
   const cv=document.createElement('canvas');cv.width=bmp.width;cv.height=bmp.height;const cx=cv.getContext('2d',{willReadFrequently:true});cx.drawImage(bmp,0,0);
   const px=cx.getImageData(0,0,bmp.width,bmp.height).data,W=bmp.width,H=bmp.height,dem=new Float32Array(W*H);
   for(let i=0;i<dem.length;i++)dem[i]=px[i*4]*256+px[i*4+1];
   const b=j.bounds,[x0,z0]=M.xz(b.latN,b.lonW),[x1,z1]=M.xz(b.latS,b.lonE);
-  const step=narrow()?4:3,gw=Math.floor((W-1)/step),gh=Math.floor((H-1)/step);
+  const step=(W-1)/340,gw=Math.floor((W-1)/step),gh=Math.floor((H-1)/step);
   const g=new THREE.PlaneGeometry(x1-x0,z1-z0,gw,gh);g.rotateX(-Math.PI/2);g.translate((x0+x1)/2,0,(z0+z1)/2);
   const pos=g.attributes.position;
   for(let k=0;k<pos.count;k++){const u=(pos.getX(k)-x0)/(x1-x0),v=(pos.getZ(k)-z0)/(z1-z0);const fx=Math.min(W-1,Math.max(0,Math.round(u*(W-1)))),fz=Math.min(H-1,Math.max(0,Math.round(v*(H-1))));pos.setY(k,dem[fz*W+fx]/1000*EX*SC+.004);}
@@ -123,6 +123,7 @@ async function loadPatch(name,slot){
   holes[slot].set(x0,z0,x1,z1);mat.uniforms.uHoleN.value=Math.max(mat.uniforms.uHoleN.value,slot+1);
 }
 function startPatches(){
+  if(narrow()||S.LITE)return; // phones: the overview is enough, and the detail tiles are ~12 MB
   if(patchesStarted||!M)return;patchesStarted=true;
   // load one after another so the first view stays smooth
   (async()=>{for(let i=0;i<PATCHES.length;i++){try{await loadPatch(PATCHES[i],i);}catch(e){console.warn('patch',PATCHES[i],e);holes[i].set(0,0,0,0);}}})();
@@ -176,7 +177,7 @@ function showTip(C){
   const cv=S.AUTO?L.slice(0,3).find(c=>c.vc):null;
   const acts=c=>`<div class="a"><button class="btn btn-glow" type="button" data-open="${c.id}">Details</button>${ROUTES[c.id]?`<button class="btn btn-line" type="button" data-along="${c.id}">Fly along</button>`:''}${c.feat?`<button class="btn btn-line" type="button" data-fly="${c.feat}">Walk it in 3D</button>`:''}</div>`;
   const rest=L.slice(1,4);
-  tip.innerHTML=`<div class="tv"><img src="${esc((cv||c0).img)}" alt="">${cv?`<video src="${esc(cv.vc)}" muted loop playsinline autoplay aria-hidden="true"></video>`:''}</div><div class="b"><div class="ti">
+  tip.innerHTML=`<div class="tv"><img src="${esc((cv||c0).th||(cv||c0).img)}" alt="">${cv?`<video src="${esc(cv.vc)}" muted loop playsinline autoplay aria-hidden="true"></video>`:''}</div><div class="b"><div class="ti">
     <div class="m" style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:${COL[c0.type]}">${esc(S.TNAME[c0.type])} · ${esc(c0.region)}</div>
     <h4>${esc(c0.name)}</h4><div class="m"><span>${esc(c0.dur)}</span>${c0.alt?`<span>${fmt(c0.alt)} m</span>`:''}<span>From US$${fmt(c0.price)}</span></div>${acts(c0)}</div>
     ${rest.length?`<div class="tmore"><small>Also from here</small>${rest.map(c=>`<button type="button" class="trow" data-open="${c.id}"${ROUTES[c.id]?` data-hover="${c.id}"`:''}><i style="background:${COL[c.type]}"></i><span>${esc(c.name)}</span><em>${esc(c.dur)}</em></button>`).join('')}</div>`:''}
@@ -382,7 +383,7 @@ new ResizeObserver(resize).observe(stage);resize();
 let visible=false,last=performance.now(),started=false,idleN=0;const lastCP=new THREE.Vector3(1e9,0,0),lastCQ=new THREE.Quaternion();
 function start(){
   if(started)return;started=true;
-  load().then(()=>{const go=()=>{buildPins();buildChips();buildNet();setTimeout(startPatches,narrow()?2500:1200);if(S.pendingRoute){const id=S.pendingRoute;S.pendingRoute=null;S.showRoute(id,true);}};if(S.cat&&S.cat.length)go();else document.addEventListener('hf:data',go,{once:true});apply(want(performance.now()),0,true);}).catch(e=>{console.error(e);loading.textContent='The map could not load. Refresh to try again.';});
+  load().then(()=>{const go=()=>{buildPins();buildChips();buildNet();['pointerdown','pointerenter','wheel'].forEach(ev=>stage.addEventListener(ev,startPatches,{once:true,passive:true}));setTimeout(startPatches,6000);if(S.pendingRoute){const id=S.pendingRoute;S.pendingRoute=null;S.showRoute(id,true);}};if(S.cat&&S.cat.length)go();else document.addEventListener('hf:data',go,{once:true});apply(want(performance.now()),0,true);}).catch(e=>{console.error(e);loading.textContent='The map could not load. Refresh to try again.';});
 }
 new IntersectionObserver(es=>es.forEach(e=>{visible=e.isIntersecting;if(visible){start();last=performance.now();requestAnimationFrame(loop);}}),{rootMargin:'300px 0px'}).observe(stage);
 function loop(now){

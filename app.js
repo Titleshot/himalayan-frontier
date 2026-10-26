@@ -1,6 +1,15 @@
 /* Himalayan Frontier – page content and UI state. Works without WebGL; the 3D views listen to events fired here. */
 (function(){
 'use strict';
+/* iPhones in Low Power Mode refuse to autoplay films. Remember every film that was refused and start the
+   visible ones on the reader's next tap, which Safari always allows. */
+(()=>{const P=HTMLMediaElement.prototype,orig=P.play,pend=new Set();
+  P.play=function(){const r=orig.call(this);if(r&&r.catch)r.catch(e=>{if(e&&e.name==='NotAllowedError')pend.add(this);});return r;};
+  const near=v=>{if(v.classList.contains('reel-src')||v.classList.contains('rp-src'))return true;const r=v.getBoundingClientRect();return r.bottom>-300&&r.top<innerHeight+300;};
+  const kick=()=>{document.querySelectorAll('video[autoplay]').forEach(v=>{if(v.paused&&v.currentSrc&&!v.matches('.reel:not(.on)'))pend.add(v);});
+    pend.forEach(v=>{if(!v.isConnected){pend.delete(v);return;}if(near(v)){pend.delete(v);orig.call(v).catch(()=>{});}});};
+  ['touchend','click','keydown'].forEach(ev=>addEventListener(ev,kick,{passive:true,capture:true}));
+})();
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const fmt=n=>Math.round(n).toLocaleString('en-US');
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -135,7 +144,7 @@ const VM=(()=>{
   const io='IntersectionObserver' in window?new IntersectionObserver(es=>{es.forEach(e=>{if(e.isIntersecting&&e.intersectionRatio>=.5)vis.add(e.target);else vis.delete(e.target);});sched();},{threshold:[0,.5,.9]}):null;
   function sched(){if(!t)t=setTimeout(()=>{t=0;apply();},140);}
   function vid(c){if(c._v)return c._v;const m=c.querySelector('.tmedia');if(!m)return null;
-    const v=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='none';v.setAttribute('aria-hidden','true');v.src=c.dataset.vid;
+    const v=document.createElement('video');v.muted=true;v.defaultMuted=true;v.setAttribute('muted','');v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='none';v.setAttribute('aria-hidden','true');v.src=c.dataset.vid;
     v.addEventListener('playing',()=>c.classList.add('playing'),{once:true});m.appendChild(v);return c._v=v;}
   function apply(){
     const cy=innerHeight/2,dist=c=>{const r=c.getBoundingClientRect();return Math.abs(r.top+r.height/2-cy);};
@@ -320,7 +329,7 @@ function heroReel(){
   const L=['hero-bg','exp-lhotse','heli-abc','tibet-everest-north','exp-ama-dablam','ktm-everest-flight','te-gokyo-ri-15'];
   const src=n=>`assets/vh/${n}${small()?'-m':''}.mp4`;
   v0.classList.add('reel','on');
-  const mk=()=>{const v=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';v.className='reel';v.setAttribute('aria-hidden','true');media.appendChild(v);return v;};
+  const mk=()=>{const v=document.createElement('video');v.muted=true;v.defaultMuted=true;v.setAttribute('muted','');v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';v.className='reel';v.setAttribute('aria-hidden','true');media.appendChild(v);return v;};
   if(small()||(navigator.connection&&/(^|-)[23]g$/.test(navigator.connection.effectiveType||'')))return; // phones keep one film: less data, smoother scrolling
   let cur=v0,nxt=mk(),i=0;
   setTimeout(()=>{nxt.src=src(L[1]);},6000);
@@ -379,6 +388,7 @@ renderStatic();
 fetch('assets/geo/routes.json').then(r=>r.json()).then(r=>{S.routeIds=new Set(Object.keys(r));if(S.cat.length)renderCatalog();}).catch(()=>{});
 Promise.all([fetch('assets/geo/treks.json').then(r=>r.json()),fetch('assets/catalog.json').then(r=>r.json())]).then(([d,cat])=>{
   S.data=d;S.cat=cat;
+  cat.forEach(c=>{c.th=c.img&&c.img.startsWith('assets/cat2/')?c.img.replace('assets/cat2/','assets/th/'):c.img;}); // small copies for tiles
   const fT=$('#fTrek');const groups={};
   cat.forEach(c=>{const g=TNAME[c.type];(groups[g]=groups[g]||[]).push(c);});
   Object.entries(groups).forEach(([g,L])=>{const og=document.createElement('optgroup');og.label=g;L.forEach(c=>og.appendChild(new Option(`${c.name} · ${c.dur}`,c.id)));fT.appendChild(og);});
