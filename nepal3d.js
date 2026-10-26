@@ -137,7 +137,7 @@ const CITY=[['Kathmandu',27.717,85.324],['Pokhara',28.209,83.985],['Lukla',27.68
 let rl=[];
 function buildPins(){
   const groups=new Map();
-  S.cat.filter(c=>c.lat!=null&&c.type!=='abroad').forEach(c=>{const gs=narrow()?.09:.04;const k=(Math.round(c.lat/gs))+':'+(Math.round(c.lon/gs));if(!groups.has(k))groups.set(k,[]);groups.get(k).push(c);});
+  S.cat.filter(c=>c.lat!=null&&c.type!=='abroad').forEach(c=>{const gs=.04;const k=(Math.round(c.lat/gs))+':'+(Math.round(c.lon/gs));if(!groups.has(k))groups.set(k,[]);groups.get(k).push(c);});
   const prio={expedition:3,peak:2,trek:1,tour:0};
   pinsEl.innerHTML='';clusters=[];
   for(const L of groups.values()){
@@ -149,14 +149,14 @@ function buildPins(){
     if(L.length>1)el.dataset.n=L.length;
     pinsEl.appendChild(el);
     const C={L,v,el,types:new Set(L.map(c=>c.type))};clusters.push(C);
-    el.addEventListener('mouseenter',()=>{clearTimeout(hideT);if(!pinned&&tipC!==C)showTip(C);});
-    el.addEventListener('mouseleave',()=>{if(!pinned)hideSoon();});
+    el.addEventListener('mouseenter',()=>{clearTimeout(hideT);clearTimeout(hoverT);hovC=C;if(pinned||tipC===C)return;hoverT=setTimeout(()=>{if(hovC===C&&!pinned)showTip(C);},tipC?240:90);});
+    el.addEventListener('mouseleave',()=>{clearTimeout(hoverT);if(hovC===C)hovC=null;if(!pinned)hideSoon();});
     el.addEventListener('click',e=>{e.stopPropagation();pinned=C;pinnedRoute=true;showTip(C);});
   }
   rl=[...REG.filter(r=>!narrow()||!['Rara','Chitwan'].includes(r[0])).map(r=>['',...r]),...CITY.filter(c=>!narrow()||c[0]==='Kathmandu'||c[0]==='Pokhara').map(c=>['city',...c])].map(([cls,n,lat,lon])=>{const [x,z]=M.xz(lat,lon);const d=document.createElement('div');d.className='rlbl '+cls;d.textContent=n;pinsEl.appendChild(d);return {el:d,v:new THREE.Vector3(x,M.h(x,z)+(cls?.05:.9),z)};});
   applyFilter();
 }
-function applyFilter(){clusters.forEach(C=>{C.vis=[...C.types].some(t=>on.has(t));C.el.classList.toggle('off',!C.vis);});if(pinned&&!pinned.vis)closeTip();if(active&&!on.has((S.tripById(active.id)||{}).type))clearRoute();if(netLines.length)applyNet();}
+function applyFilter(){regroupNow=true;clusters.forEach(C=>{C.vis=[...C.types].some(t=>on.has(t));C.el.classList.toggle('off',!C.vis);});if(pinned&&!pinned.vis)closeTip();if(active&&!on.has((S.tripById(active.id)||{}).type))clearRoute();if(netLines.length)applyNet();}
 // chips + legend
 const COL={trek:'#eaa66c',peak:'#8fc6d6',expedition:'#e86a5a',tour:'#b9c98a'};
 function buildChips(){
@@ -168,20 +168,23 @@ function buildChips(){
   $('#nlegend').innerHTML=`<span><i style="background:${COL.trek};box-shadow:0 0 0 3px rgba(234,166,108,.35)"></i>Glowing pins fly in 3D</span><span>Numbers: trips that start there</span><span><i style="background:none;border:1px dashed #fff"></i>Dashed: helicopter flights</span>`;
 }
 // tooltip
-let pinned=null,hideT=0,tipC=null,pinnedRoute=false;
+let pinned=null,hideT=0,tipC=null,pinnedRoute=false,hoverT=0,hovC=null,driftT=0,driftLast=0;
 function showTip(C){
   clearTimeout(hideT);tipC=C;
-  const c0=C.L[0];
-  const cv=S.AUTO?C.L.slice(0,4).find(c=>c.vc):null;
-  tip.innerHTML=`<div class="tv"><img src="${esc((cv||c0).img)}" alt="">${cv?`<video src="${esc(cv.vc)}" muted loop playsinline autoplay aria-hidden="true"></video>`:''}</div><div class="b">${C.L.slice(0,4).map((c,i)=>`<div class="ti"${i?' style="border-top:1px solid var(--ridge);padding-top:8px"':''}>
-    <div class="m" style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:${COL[c.type]}">${esc(S.TNAME[c.type])} · ${esc(c.region)}</div>
-    <h4>${esc(c.name)}</h4><div class="m"><span>${esc(c.dur)}</span>${c.alt?`<span>${fmt(c.alt)} m</span>`:''}<span>From US$${fmt(c.price)}</span></div>
-    <div class="a"><button class="btn btn-glow" type="button" data-open="${c.id}">Details</button>${ROUTES[c.id]&&C.L.length>1?`<button class="btn btn-line" type="button" data-route="${c.id}">Route</button>`:''}${ROUTES[c.id]?`<button class="btn btn-line" type="button" data-along="${c.id}">Fly along</button>`:''}${c.feat?`<button class="btn btn-line" type="button" data-fly="${c.feat}">Walk it day by day</button>`:''}</div></div>`).join('')}
-    ${C.L.length>4?`<button class="btn btn-line" type="button" data-more style="width:100%">See all ${C.L.length} trips here</button>`:''}</div>`;
+  const L=C.GL||C.L;
+  const c0=L[0];
+  const cv=S.AUTO?L.slice(0,3).find(c=>c.vc):null;
+  const acts=c=>`<div class="a"><button class="btn btn-glow" type="button" data-open="${c.id}">Details</button>${ROUTES[c.id]?`<button class="btn btn-line" type="button" data-along="${c.id}">Fly along</button>`:''}${c.feat?`<button class="btn btn-line" type="button" data-fly="${c.feat}">Walk it in 3D</button>`:''}</div>`;
+  const rest=L.slice(1,4);
+  tip.innerHTML=`<div class="tv"><img src="${esc((cv||c0).img)}" alt="">${cv?`<video src="${esc(cv.vc)}" muted loop playsinline autoplay aria-hidden="true"></video>`:''}</div><div class="b"><div class="ti">
+    <div class="m" style="font:500 11px var(--mono);letter-spacing:.08em;text-transform:uppercase;color:${COL[c0.type]}">${esc(S.TNAME[c0.type])} · ${esc(c0.region)}</div>
+    <h4>${esc(c0.name)}</h4><div class="m"><span>${esc(c0.dur)}</span>${c0.alt?`<span>${fmt(c0.alt)} m</span>`:''}<span>From US$${fmt(c0.price)}</span></div>${acts(c0)}</div>
+    ${rest.length?`<div class="tmore"><small>Also from here</small>${rest.map(c=>`<button type="button" class="trow" data-open="${c.id}"${ROUTES[c.id]?` data-hover="${c.id}"`:''}><i style="background:${COL[c.type]}"></i><span>${esc(c.name)}</span><em>${esc(c.dur)}</em></button>`).join('')}</div>`:''}
+    ${L.length>4?`<button class="btn btn-line" type="button" data-more style="width:100%">See all ${L.length} trips here</button>`:''}</div>`;
   const tvv=tip.querySelector('.tv video');if(tvv)tvv.addEventListener('playing',()=>{tvv.style.opacity=1;});
   tip.hidden=false;placeTip();
-  const first=C.L.find(c=>ROUTES[c.id]);if(first)showRoute(first.id,!!pinned);
-  tip.querySelectorAll('.ti').forEach((el,i)=>{const c=C.L[i];if(c&&ROUTES[c.id]){el.addEventListener('mouseenter',()=>showRoute(c.id,!!pinned));el.addEventListener('focusin',()=>showRoute(c.id,!!pinned));}});
+  const first=L.find(c=>ROUTES[c.id]);if(first)showRoute(first.id,!!pinned);
+  tip.querySelectorAll('[data-hover]').forEach(el=>{const id=el.dataset.hover;el.addEventListener('mouseenter',()=>showRoute(id,!!pinned));el.addEventListener('focusin',()=>showRoute(id,!!pinned));});
   tip.querySelectorAll('[data-route]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();showRoute(b.dataset.route,true);}));
   tip.querySelectorAll('[data-along]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();closeTip();S.flyAlong(b.dataset.along);}));
   tip.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click',()=>{S.openTrip(b.dataset.open);}));
@@ -242,7 +245,7 @@ function buildNet(){
   }
   applyNet();
 }
-function markPins(){const on2=!!(active&&active.fly);pinsEl.classList.toggle('dim',on2);clusters.forEach(C=>C.el.classList.toggle('act',on2&&C.L.some(c=>c.id===active.id)));}
+function markPins(){const on2=!!(active&&active.fly);pinsEl.classList.toggle('dim',on2);clusters.forEach(C=>C.el.classList.toggle('act',on2&&(C.GL||C.L).some(c=>c.id===active.id)));}
 function applyNet(){markPins();netLines.forEach(o=>{o.ln.visible=on.has(o.type);o.ln.material.opacity=active?(o.id===active.id?0:o.ln.userData.base*.3):o.ln.userData.base;});}
 let active=null;           // {id, curves, total, t0, center, rad}
 const focus={w:0,cx:0,cz:0,rad:40};let flyer=null,dbgFocus=false,snapNext=false;
@@ -311,6 +314,7 @@ function want(now){
   w.rad*=1+q*2.6;w.az+=q*1.5;w.pol=lerp(.02,w.pol,e);
   return w;
 }
+function drift(now){const d=driftLast?now-driftLast:0;driftLast=now;if(!tipC&&!hovC&&ptr.id===null)driftT+=Math.min(d,100);return driftT;}
 function want0(now){
   const r=stage.getBoundingClientRect(),vh=innerHeight;
   // 0 when the map's top enters the screen, 1 when its bottom leaves
@@ -329,7 +333,7 @@ function want0(now){
   return {
     pol:lerp(lerp(.1,.9,k),Math.max(.62,lerp(.1,.9,k)),fw),
     rad:lerp(lerp(asp<1?118:80,asp<1?74:58,k),focus.rad,fw),
-    az:lerp(-.12,-.3,k)+user.az+(reduce?0:Math.sin(now/14000)*.04),
+    az:lerp(-.12,-.3,k)+user.az+(reduce?0:Math.sin(drift(now)/14000)*.04),
     tx:lerp(lerp(0,asp<1?2:1,k),focus.cx,fw), tz:lerp(lerp(0,-3.5,k),focus.cz+(asp<1?2:1.5),fw)
   };
   return {
@@ -350,16 +354,32 @@ function apply(w,dt,snap){
 
 /* ---------- loop ---------- */
 const pv=new THREE.Vector3();
+/* pins that land within a finger's width of each other on screen merge into one pin with a count, so nothing overlaps */
+let pf=0,regroupNow=true;const prio2={expedition:3,peak:2,trek:1,tour:0};
+function regroup(order){
+  const R2=(narrow()?26:20)**2,lead=[];
+  const rank=[...order].sort((a,b)=>(b.L.some(c=>c.feat)?1:0)-(a.L.some(c=>c.feat)?1:0)||b.L.length-a.L.length);
+  for(const C of rank){C.lead=null;C.grp=[C];const Ld=lead.find(Q=>(Q.sx-C.sx)**2+(Q.sy-C.sy)**2<R2);if(Ld){C.lead=Ld;Ld.grp.push(C);}else lead.push(C);}
+  for(const C of order){
+    if(C.lead){C.el.style.pointerEvents='none';continue;}C.el.style.pointerEvents='';
+    const GL=C.grp.flatMap(Q=>Q.L).filter(c=>on.has(c.type)||C.grp.length===1).sort((a,b)=>(b.feat?1:0)-(a.feat?1:0)||prio2[b.type]-prio2[a.type]);
+    C.GL=GL.length?GL:C.L;
+    if(C.GL.length>1)C.el.dataset.n=C.GL.length;else delete C.el.dataset.n;
+    C.el.className='pin t-'+C.GL[0].type+(C.GL.some(c=>c.feat)?' feat':'')+(C.el.classList.contains('act')?' act':'');
+    C.el.setAttribute('aria-label',C.GL.map(c=>c.name).join(', '));
+  }
+}
 function project(){
   const w=stage.clientWidth,h=stage.clientHeight;
   const order=clusters.filter(C=>C.vis).map(C=>{pv.copy(C.v).project(camera);C.sx=(pv.x*.5+.5)*w;C.sy=(-pv.y*.5+.5)*h;C.z=pv.z;return C;}).sort((a,b)=>b.z-a.z);
-  order.forEach((C,i)=>{const ok=C.z<1&&C.sx>-20&&C.sx<w+20&&C.sy>-20&&C.sy<h+20;C.el.style.transform=`translate(${C.sx.toFixed(1)}px,${C.sy.toFixed(1)}px)`;C.el.style.zIndex=i+1;C.el.style.visibility=ok?'':'hidden';});
+  if((++pf%8===0||regroupNow)&&!hovC&&!tipC){regroupNow=false;regroup(order);}
+  order.forEach((C,i)=>{const ok=!C.lead&&C.z<1&&C.sx>-20&&C.sx<w+20&&C.sy>-20&&C.sy<h+20;C.el.style.transform=`translate(${C.sx.toFixed(1)}px,${C.sy.toFixed(1)}px)`;C.el.style.zIndex=(C===tipC||C===hovC)?999:i+1;C.el.style.visibility=ok?'':'hidden';});
   for(const L of rl){pv.copy(L.v).project(camera);const ok=pv.z<1;L.el.style.visibility=ok?'':'hidden';L.el.style.left=((pv.x*.5+.5)*w).toFixed(1)+'px';L.el.style.top=((-pv.y*.5+.5)*h).toFixed(1)+'px';}
   placeTip();
 }
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?52:38;camera.updateProjectionMatrix();lineMats.forEach(m=>m.resolution.set(w,h));}
 new ResizeObserver(resize).observe(stage);resize();
-let visible=false,last=performance.now(),started=false;
+let visible=false,last=performance.now(),started=false,idleN=0;const lastCP=new THREE.Vector3(1e9,0,0),lastCQ=new THREE.Quaternion();
 function start(){
   if(started)return;started=true;
   load().then(()=>{const go=()=>{buildPins();buildChips();buildNet();setTimeout(startPatches,narrow()?2500:1200);if(S.pendingRoute){const id=S.pendingRoute;S.pendingRoute=null;S.showRoute(id,true);}};if(S.cat&&S.cat.length)go();else document.addEventListener('hf:data',go,{once:true});apply(want(performance.now()),0,true);}).catch(e=>{console.error(e);loading.textContent='The map could not load. Refresh to try again.';});
@@ -373,6 +393,10 @@ function loop(now){
   animRoute(now,dt);
   if(snapNext){focus.w=1;}
   apply(want(now),dt,snapNext||introSnap);snapNext=false;introSnap=false;
+  // when the camera is still and no route is animating, skip most frames: same picture, far less work for the GPU
+  const moved=camera.position.distanceToSquared(lastCP)>1e-6||Math.abs(camera.quaternion.dot(lastCQ))<1-1e-9;
+  if(!moved&&!active&&(idleN++%12))return;
+  lastCP.copy(camera.position);lastCQ.copy(camera.quaternion);
   renderer.render(scene,camera);
   if(clusters.length)project();
 }

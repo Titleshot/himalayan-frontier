@@ -22,7 +22,7 @@ const scene=new THREE.Scene();
 const camera=new THREE.PerspectiveCamera(45,1,0.05,900);
 const sun=new THREE.Vector3(0.46,0.56,0.69).normalize();   // late-morning sun from the south-east, close to the satellite pass
 const floatLinear=renderer.extensions.has('OES_texture_float_linear');
-const SHADOW_STEPS=narrow()?16:30;
+const SHADOW_STEPS=narrow()?12:18;
 
 const GL=`
 vec3 aces(vec3 x){return clamp((x*(2.51*x+.03))/(x*(2.43*x+.59)+.14),0.,1.);}
@@ -44,7 +44,7 @@ const terrainMat=new THREE.ShaderMaterial({
     vec3 alb=pow(texture2D(uTex,vUv).rgb,vec3(2.2));
     // soft cast shadows: march the height field toward the sun
     float sh=1.,t=.05;vec3 p=vP+vec3(0.,.012,0.);
-    for(int i=0;i<${SHADOW_STEPS};i++){vec3 q=p+uSun*t;vec2 u=q.xz/uK+.5;if(u.x<0.||u.x>1.||u.y<0.||u.y>1.)break;float d=q.y-H(q.xz);sh=min(sh,10.*d/t);if(sh<0.)break;t*=${narrow()?'1.32':'1.17'};}
+    for(int i=0;i<${SHADOW_STEPS};i++){vec3 q=p+uSun*t;vec2 u=q.xz/uK+.5;if(u.x<0.||u.x>1.||u.y<0.||u.y>1.)break;float d=q.y-H(q.xz);sh=min(sh,10.*d/t);if(sh<0.)break;t*=${narrow()?'1.45':'1.32'};}
     sh=clamp(sh,0.,1.);sh=sh*sh*(3.-2.*sh);
     float dif=max(dot(n,uSun),0.)*sh;
     float sky=.5+.5*n.y;
@@ -60,7 +60,7 @@ const terrainMat=new THREE.ShaderMaterial({
   }`});
 
 /* ------------ region loading ------------ */
-const regions={};
+const regions={},R_hd={};const wantHD=n=>{if(narrow()||S.LITE||!R_hd[n])return;const f=R_hd[n];R_hd[n]=null;setTimeout(f,1500);};
 const texLoader=new THREE.TextureLoader();
 const loadTex=url=>new Promise((res,rej)=>texLoader.load(url,res,undefined,rej));
 async function loadRegion(name){
@@ -90,7 +90,7 @@ async function loadRegion(name){
   g.computeVertexNormals();
   R.mesh=new THREE.Mesh(g,terrainMat);
   // sharper imagery on large screens, swapped in once it arrives
-  if(!narrow())loadTex(`assets/geo/${name}-tex-hd.jpg`).then(hd=>{hd.anisotropy=an;hd.minFilter=THREE.LinearMipmapLinearFilter;R.tex=hd;if(cur===R)terrainMat.uniforms.uTex.value=hd;}).catch(()=>{});
+  R_hd[name]=()=>loadTex(`assets/geo/${name}-tex-hd.jpg`).then(hd=>{hd.anisotropy=an;hd.minFilter=THREE.LinearMipmapLinearFilter;R.tex=hd;if(cur===R)terrainMat.uniforms.uTex.value=hd;}).catch(()=>{});
   regions[name]=R;return R;
 }
 
@@ -133,9 +133,9 @@ function mkLabel(cls,html,v,prio,extra={}){const d=document.createElement('div')
 function buildLabels(){
   labelsEl.innerHTML='';labels=[];
   const t=TK.t, wps=R.j.wps;
-  const seen=new Set();
+  const seen=new Set();let si=0;
   t.itin.forEach(d=>d.via.forEach(n=>{if(seen.has(n)||!wps[n])return;seen.add(n);const w=wps[n];
-    mkLabel('stop',`${n}<small>${fmt(w[2])} m</small>`,new THREE.Vector3(w[0],R.y(w[0],w[1])+.36,w[1]),300,{name:n});}));
+    mkLabel('stop',`${n}<small>${fmt(w[2])} m</small>`,new THREE.Vector3(w[0],R.y(w[0],w[1])+.36,w[1]),300,{name:n,si:si++});}));
   R.j.peaks.forEach(p=>mkLabel('peak',`${p[0]}<small>${fmt(p[3])} m</small>`,new THREE.Vector3(p[1],p[4]/1000*EX+.06,p[2]),200+p[3]/100,{peak:true}));
   R.j.rivers.forEach(r=>mkLabel('river',r[0],new THREE.Vector3(r[1],R.y(r[1],r[2])+.03,r[2]),120));
   requestAnimationFrame(()=>labels.forEach(L=>{L.w=L.el.offsetWidth;L.h=L.el.offsetHeight;}));
@@ -152,18 +152,24 @@ function updateLabels(curName){
   const w=stage.clientWidth,h=stage.clientHeight,placed=[...blockers];
   const order=labels.map(L=>[L.name===curName?1000:L.prio,L]).sort((a,b)=>b[0]-a[0]);
   const occ=frameN%3===0;
+  // keep the map readable: only a handful of names at a time, fewer on phones, and only nearby stops while walking
+  const nar=narrow(),fol=!!curName,curL=labels.find(L=>L.name===curName),ci=curL?curL.si:-1;
+  const cap={stop:nar?(fol?2:3):(fol?4:5),peak:nar?1:2,river:nar||fol?0:1},cnt={stop:0,peak:0,river:0};
   for(const [p,L] of order){
     pv.copy(L.v).project(camera);
     let ok=pv.z<1&&pv.x>-1&&pv.x<1&&pv.y>-1&&pv.y<1;
+    const kind=L.peak?'peak':L.si!=null?'stop':'river';
+    if(ok&&L.name!==curName){if(cnt[kind]>=cap[kind])ok=false;else if(fol&&kind==='stop'&&ci>=0&&(L.si<ci-1||L.si>ci+(nar?1:2)))ok=false;}
     const x=(pv.x*.5+.5)*w,y=(-pv.y*.5+.5)*h;
     if(ok&&L.peak&&camera.position.distanceTo(L.v)>TK.size.length()*2.2)ok=false;
-    if(ok&&occ)L.occ=occluded(L.v);
+    if(ok&&occ){const o=occluded(L.v);L.occN=o===L.occ?0:(L.occN||0)+1;if(L.occ===undefined||L.occN>=2){L.occ=o;L.occN=0;}}
     if(ok&&L.occ&&L.name!==curName)ok=false;
     let rx=x-L.w/2, ry=y-L.h-(L.peak?4:8);
     if(L.el.classList.contains('river'))ry=y-L.h/2;
     const rect=[rx,ry,rx+L.w,ry+L.h];
     if(ok&&(rect[0]<4||rect[2]>w-4||rect[1]<4||rect[3]>h-4))ok=false;
     if(ok)for(const q of placed){if(rect[0]<q[2]+3&&rect[2]>q[0]-3&&rect[1]<q[3]+2&&rect[3]>q[1]-2){ok=(L.name===curName);break;}}
+    if(ok&&L.name!==curName)cnt[kind]++;
     if(ok){placed.push(rect);L.el.style.transform=`translate(${rx.toFixed(1)}px,${ry.toFixed(1)}px)`;}
     L.el.classList.toggle('on',ok);
     L.el.classList.toggle('cur',L.name===curName);
@@ -193,7 +199,7 @@ const navh=()=>parseInt(getComputedStyle(document.documentElement).getPropertyVa
 /* The walk is opt-in. By default the section is an ordinary block: Play, the day list and the
    arrows move a virtual position (vpx). "Scroll mode" stretches the section so that page
    scrolling walks the route; it switches itself off once the reader scrolls past or away. */
-let walk=true, vpx=0, vTarget=0;
+let walk=false, vpx=0, vTarget=0, near=false;
 const exSec=document.getElementById('explore'), hintEl=document.getElementById('hint'), cta=document.getElementById('exCta'), bWalk=document.getElementById('bWalk');
 function layoutTrack(){
   if(!TK)return;
@@ -229,7 +235,7 @@ function setWalk(on){
   if(on===walk||!TK)return;
   const html=document.documentElement;html.style.overflowAnchor='none';
   if(on){
-    const from=vpx;walk=true;exSec.classList.add('walking');layoutTrack();
+    const from=vpx;walk=true;exSec.classList.add('walking');layoutTrack();if(R)wantHD(R.name);
     scrollToPx(trackTop()+Math.max(2,from),true);
   }else{
     const r=track.getBoundingClientRect(),sh=sticky.offsetHeight,before=track.offsetHeight;
@@ -243,9 +249,9 @@ function setWalk(on){
   requestAnimationFrame(()=>requestAnimationFrame(()=>{html.style.overflowAnchor='';}));
 }
 function updUI(){
-  hintEl.textContent=walk?'Scroll to walk · drag to look around':'Drag to look around · tap a day or press Play';
+  hintEl.textContent=walk?'Scroll to walk · drag to look around':'Choose a trek to start · drag to look around';
 }
-exSec.classList.add('walking');
+updUI();
 function scrollToPx(y,smooth){scrollTo({top:Math.max(0,y),behavior:smooth&&!reduce?'smooth':'instant'});}
 /* glide: a timed page scroll, so the map visibly walks from one stop to the next */
 let gliding=0;
@@ -258,18 +264,11 @@ function glide(y,ms){
 }
 const stopGlide=()=>{if(gliding)gliding=0;};
 ['wheel','touchstart','keydown','pointerdown'].forEach(ev=>addEventListener(ev,stopGlide,{passive:true}));
-/* each scroll gesture finishes the day it is on: when the wheel or swipe stops between stops, glide on to the next one */
-let snapT=0,lastSY=scrollY,sdir=1;
 function dayStops(){return TK.mapDays.map((d,k)=>introPx+k*dayPx+dayPx*.8);}
-function snapDay(){
-  if(!walk||playing||gliding||!TK)return;
-  const px=scrolled();if(px<introPx*.15||px>trackLen()-4)return;
-  const st=dayStops();let target=null;
-  if(sdir>0)target=st.find(s=>s>=px-4);else{for(let i=st.length-1;i>=0;i--)if(st[i]<=px+4){target=st[i];break;}}
-  if(target==null||Math.abs(target-px)<6||Math.abs(target-px)>dayPx*1.05+introPx)return;
-  glide(trackTop()+target);
-}
-addEventListener('scroll',()=>{const y=scrollY;if(y!==lastSY)sdir=y>lastSY?1:-1;lastSY=y;if(gliding||playing)return;clearTimeout(snapT);snapT=setTimeout(snapDay,180);},{passive:true});
+/* the walk switches itself off once the reader scrolls well past it, or back above it, so the page stays short for everyone else */
+let leaveT=0;
+function checkLeave(){if(!walk||playing||gliding)return;clearTimeout(leaveT);leaveT=setTimeout(()=>{if(!walk||playing||gliding||!TK)return;const r=track.getBoundingClientRect();if(r.top>innerHeight*1.1||scrolled()>trackLen()+innerHeight*.9)setWalk(false);},350);}
+addEventListener('scroll',checkLeave,{passive:true});
 function nextStop(){if(!TK)return;const px=scrolled();const t=dayStops().find(s=>s>px+8);if(t!=null)glide(trackTop()+t);else S.scrollToEl(document.getElementById('trip'));}
 
 /* ------------ camera rig ------------ */
@@ -322,8 +321,9 @@ function startPlay(){
   }else if(vpx>=trackLen()-2)vpx=vTarget=0;
   setPlay(true);
 }
-bPlay.addEventListener('click',()=>{if(playing)setPlay(false);else startPlay();});
-$('#ctaPlay').addEventListener('click',startPlay);
+bPlay.addEventListener('click',()=>{if(playing)setPlay(false);else if(!walk)doScroll({mode:'play',day:0});else startPlay();});
+$('#ctaPlay').addEventListener('click',()=>{if(TK)doScroll({mode:'play',day:0});});
+S.startWalk=(play)=>{if(TK)doScroll({mode:play?'play':'start',day:0});};
 $('#ctaWalk').addEventListener('click',()=>{setPlay(false);S.scrollToEl(document.getElementById('trip'));});
 bWalk.addEventListener('click',()=>{setPlay(false);S.scrollToEl(document.getElementById('trip'));});
 // in scroll mode the reader's own scrolling takes over from Play
@@ -367,8 +367,8 @@ async function showTrek(id){
   terrainMat.uniforms.uTex.value=R.tex;terrainMat.uniforms.uNrm.value=R.nrm;terrainMat.uniforms.uDem.value=R.demTex;terrainMat.uniforms.uK.value.set(R.KX,R.KZ);
   loadingEl.hidden=true;setPlay(false);
   user.az=0;user.pol=0;user.zoom=1;
-  buildTrek(id);smoothHeading=TK.heading;
-  document.getElementById('ctaK').textContent=`${t.name} · ${t.days} days · up to ${Math.round(t.max).toLocaleString('en-US')} m`;
+  buildTrek(id);smoothHeading=TK.heading;if(walk)wantHD(R.name);
+  document.getElementById('ctaK').textContent=`${t.days} days · up to ${Math.round(t.max).toLocaleString('en-US')} m · ${t.area||''}`.replace(/ · $/,'');
   if(!walk)vpx=vTarget=0;layoutTrack();
   const r=routeAt(curPx());headS=r.s;blendW=r.w;
   computeWant(performance.now());applyCamera(0,true);measureBlockers();
@@ -376,6 +376,13 @@ async function showTrek(id){
 }
 /* modes: 'start' → show the trek's overview, 'day' → go to that day, 'play' → start walking it */
 function doScroll(d){
+  if(!walk&&d.mode!=='tab'){
+    vpx=vTarget=0;
+    if(d.mode==='day'){vpx=vTarget=dayPos(d.day);}
+    setWalk(true);
+    if(d.mode==='play')setTimeout(startPlay,reduce?0:700);
+    return;
+  }
   if(walk){
     if(d.mode==='day'){const y=scrollForDay(d.day),far=Math.abs(y-scrollY)>dayPx*4;far?scrollToPx(y,true):glide(y);}
     else if(d.mode==='tab'){const px=scrolled();if(px>-innerHeight*.4&&px<trackLen()+innerHeight*.2)scrollToPx(trackTop()+2,true);} // only rewind if the reader is in the walk
@@ -391,18 +398,21 @@ function doScroll(d){
 document.addEventListener('hf:select',e=>{
   const {trek,day,changed,scroll}=e.detail;if(!S.data)return;
   const req=scroll?{mode:scroll,day}:(changed?{mode:'tab',day:0}:null);
+  if(!TK&&!near&&(!req||req.mode==='tab'))return; // not loaded yet: the observer loads S.trek when the reader gets close
   if(changed||!TK||TK.t.id!==trek){pendingScroll=req;if(req&&req.mode!=='tab'&&!walk)bringIntoView();showTrek(trek);}
   else if(req)doScroll(req);
 });
-document.addEventListener('hf:data',()=>{if(!TK)showTrek(S.trek);});
-if(S.data&&!TK)showTrek(S.trek);
+/* the terrain is several megabytes: fetch it only when the reader gets near the explorer */
+new IntersectionObserver((es,o)=>{if(es.some(e=>e.isIntersecting)){near=true;o.disconnect();if(S.data&&!TK)showTrek(S.trek);}},{rootMargin:'900px 0px'}).observe(exSec);
+document.addEventListener('hf:data',()=>{if(!TK&&near)showTrek(S.trek);});
+if(S.data&&!TK&&near)showTrek(S.trek);
 
 /* ------------ loop ------------ */
 function resize(){const w=stage.clientWidth,h=stage.clientHeight;if(!w||!h)return;renderer.setSize(w,h,false);camera.aspect=w/h;camera.fov=w<h?56:45;camera.updateProjectionMatrix();measureBlockers();layoutTrack();}
 new ResizeObserver(resize).observe(stage);resize();
 addEventListener('resize',()=>layoutTrack());
-let visible=false,last=performance.now(),reportedDay=-1,ctaOn=null;
-new IntersectionObserver(es=>es.forEach(e=>{visible=e.isIntersecting;if(visible){last=performance.now();requestAnimationFrame(loop);}else if(playing)setPlay(false);}),{threshold:[0]}).observe(stage);
+let visible=false,last=performance.now(),reportedDay=-1,ctaOn=null,idleN=0,lastHS=-1;const lastCP=new THREE.Vector3(1e9,0,0),lastCQ=new THREE.Quaternion();
+new IntersectionObserver(es=>es.forEach(e=>{visible=e.isIntersecting;if(visible){last=performance.now();requestAnimationFrame(loop);}else{if(playing)setPlay(false);checkLeave();}}),{threshold:[0]}).observe(stage);
 function loop(now){
   if(!visible)return;requestAnimationFrame(loop);
   const dt=Math.min(.05,(now-last)/1000);last=now;frameN++;
@@ -429,6 +439,9 @@ function loop(now){
   posAtS(headS,hp);head.position.copy(hp);head.position.y+=.03;
   const sc=camera.position.distanceTo(hp)*.035;head.scale.set(sc,sc,sc);head.visible=headS>.01||blendW>.5;
   if(profDot){const x=TK.X(headS);profDot.setAttribute('x1',x);profDot.setAttribute('x2',x);profFill.setAttribute('width',x);}
+  const moved=camera.position.distanceToSquared(lastCP)>1e-7||Math.abs(camera.quaternion.dot(lastCQ))<1-1e-9||headS!==lastHS;
+  if(!moved&&!playing&&(idleN++%12))return;
+  lastCP.copy(camera.position);lastCQ.copy(camera.quaternion);lastHS=headS;
   updateLabels(blendW>.5?curName:'');
   renderer.render(scene,camera);
 }

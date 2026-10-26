@@ -278,7 +278,7 @@ function reel(){
   const cv=$('#reelCanvas'),ctx=cv.getContext('2d'),vid=$('#reelVid'),poster=new Image();poster.src='assets/vr/reel.webp';
   let W=0,H=0,u=1,mob=false,visible=false,off=0,vel=0,last=performance.now(),drag=null,paths=[],srcSet=false;
   const PITCH=196,LOOP=PITCH*REEL.length;
-  function resize(){W=band.clientWidth;mob=W<=820;u=W/(mob?640:1440);H=Math.round(440*u);band.style.height=H+'px';const d=Math.min(devicePixelRatio||1,2);cv.width=W*d;cv.height=H*d;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(d,0,0,d,0,0);}
+  function resize(){W=band.clientWidth;mob=W<=820;u=W/(mob?640:1440);H=Math.round(440*u);band.style.height=H+'px';const d=Math.min(devicePixelRatio||1,mob?1.5:2);cv.width=W*d;cv.height=H*d;cv.style.width=W+'px';cv.style.height=H+'px';ctx.setTransform(d,0,0,d,0,0);}
   const C=()=>(mob?320:720);           // frame centre in units
   function quad(x){ // geometry for a card centred at unpushed offset t
     const cx=C(),half=mob?318:706;
@@ -287,13 +287,18 @@ function reel(){
     const yc=220-12*d*d;return {xl,xr,hl:he(xl),hr:he(xr),yc,d};
   }
   function rounded(p,r){const P=new Path2D();const n=p.length;const mid=(a,b)=>[(a[0]+b[0])/2,(a[1]+b[1])/2];const s=mid(p[n-1],p[0]);P.moveTo(s[0],s[1]);for(let i=0;i<n;i++){const a=p[i],b=p[(i+1)%n];P.arcTo(a[0],a[1],b[0],b[1],r);}P.closePath();return P;}
+  // the film is copied into a buffer only when a fresh frame is ready, so a stalled or looping video never flashes blank
+  const buf=document.createElement('canvas'),bx=buf.getContext('2d');let bufOk=false,lastVT=-1,skip=0;
+  function grab(){if(vid.readyState<2||vid.seeking||!vid.videoWidth)return;if(vid.currentTime===lastVT&&bufOk)return;lastVT=vid.currentTime;
+    if(buf.width!==vid.videoWidth){buf.width=vid.videoWidth;buf.height=vid.videoHeight;}bx.drawImage(vid,0,0);bufOk=true;}
   function frame(now){
     if(!visible)return;requestAnimationFrame(frame);
+    if(mob&&(skip=(skip+1)%2))return; // phones: 30 fps is plenty for a slow drift
     const dt=Math.min(.05,(now-last)/1000);last=now;
     if(!drag){off+=vel*dt;vel*=Math.pow(.05,dt);if(Math.abs(vel)<1)vel=0;if(AUTO)off+=50*dt;}
     ctx.clearRect(0,0,W,H);paths=[];
-    const media=vid.readyState>=2?vid:(poster.complete&&poster.naturalWidth?poster:null);
-    const mw=media?(media.videoWidth||media.naturalWidth):0,mh=media?(media.videoHeight||media.naturalHeight):0;
+    grab();const media=bufOk?buf:(poster.complete&&poster.naturalWidth?poster:null);
+    const mw=media?(media.width||media.naturalWidth):0,mh=media?(media.height||media.naturalHeight):0;
     const order=REEL.map((r,i)=>{let t=((i*PITCH-off)%LOOP+LOOP)%LOOP;if(t>=LOOP/2)t-=LOOP;return {i,t};}).sort((a,b)=>Math.abs(b.t)-Math.abs(a.t));
     const half=mob?318:706;
     for(const {i,t} of order){
@@ -318,7 +323,7 @@ function reel(){
       ctx.restore();
     }
   }
-  function hit(e){const r=cv.getBoundingClientRect(),d=Math.min(devicePixelRatio||1,2),x=(e.clientX-r.left)*d,y=(e.clientY-r.top)*d;for(let k=paths.length-1;k>=0;k--){if(ctx.isPointInPath(paths[k].P,x,y))return paths[k].i;}return -1;}
+  function hit(e){const r=cv.getBoundingClientRect(),d=cv.width/W,x=(e.clientX-r.left)*d,y=(e.clientY-r.top)*d;for(let k=paths.length-1;k>=0;k--){if(ctx.isPointInPath(paths[k].P,x,y))return paths[k].i;}return -1;}
   cv.addEventListener('pointerdown',e=>{drag={id:e.pointerId,x:e.clientX,y:e.clientY,lx:e.clientX,t:performance.now(),moved:0,touch:e.pointerType==='touch',lock:null,v:0};if(!drag.touch)cv.setPointerCapture(e.pointerId);vel=0;cursorDown(true);});
   cv.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.id)return;drag.moved=Math.max(drag.moved,Math.hypot(e.clientX-drag.x,e.clientY-drag.y));
     if(drag.touch&&!drag.lock&&drag.moved>10){if(Math.abs(e.clientY-drag.y)>Math.abs(e.clientX-drag.x)*1.15){drag=null;cursorDown(false);return;}drag.lock='x';try{cv.setPointerCapture(e.pointerId);}catch(_){}}
@@ -360,7 +365,7 @@ function desk(){
   // background film: scrub with the mouse on desktop, a quiet loop elsewhere
   const v=$('#planFilm');if(!v)return;
   if(fine&&AUTO){
-    v.src=v.dataset.scrub;v.preload='auto';let prevX=null,target=0,seeking=false,inView=false;
+    let prevX=null,target=0,seeking=false,inView=false;onView($('#plan'),x=>{if(x&&!v.getAttribute('src')){v.preload='auto';v.src=v.dataset.scrub;}},'700px');
     v.addEventListener('loadeddata',()=>{v.style.opacity=1;},{once:true});
     const seek=()=>{if(!v.duration)return;if(Math.abs(v.currentTime-target)<.02){seeking=false;return;}seeking=true;v.currentTime=target;};
     v.addEventListener('seeked',()=>{seeking=false;if(Math.abs(v.currentTime-target)>.03)seek();});

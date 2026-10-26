@@ -42,6 +42,8 @@ if(enq)enq.addEventListener('click',()=>{
 
 /* ---------- shareable trip links: #trip=<id> opens that trip; Back closes it ---------- */
 const dlg=$('#dlg');let fromPop=false;
+// closing a trip goes Back in history; keep the browser from also jumping the page back to where the trip was opened
+try{history.scrollRestoration='manual';}catch(e){}
 function tripFromHash(){const m=location.hash.match(/^#trip=([\w-]+)/);return m?m[1]:null;}
 whenCat(()=>{const id=tripFromHash();if(id&&S.tripById(id))setTimeout(()=>S.openTrip(id),400);});
 addEventListener('popstate',()=>{S._tripPushed=false;const id=tripFromHash();

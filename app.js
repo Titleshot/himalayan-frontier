@@ -63,7 +63,7 @@ function renderTabs(){
 function renderExplorer(){
   const t=T();if(!t)return;
   $$('.tab').forEach(b=>b.setAttribute('aria-selected',b.id==='tab-'+t.id));
-  const ct=$('#ctaTreks');if(ct){ct.innerHTML='<span>Or walk</span>'+treks().filter(x=>x.id!==t.id).map(x=>`<button type="button" class="chip" data-id="${x.id}">${esc(x.name)}</button>`).join('');ct.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>select(b.dataset.id,0)));}
+  const ct=$('#ctaTreks');if(ct){ct.innerHTML=treks().map(x=>`<button type="button" class="chip" data-id="${x.id}" aria-pressed="${x.id===t.id}">${esc(x.name)}</button>`).join('');ct.querySelectorAll('button').forEach(b=>b.addEventListener('click',()=>select(b.dataset.id,0)));const on=ct.querySelector('[aria-pressed="true"]');if(on&&ct.scrollWidth>ct.clientWidth)ct.scrollLeft=on.offsetLeft-ct.clientWidth/2+on.offsetWidth/2;}
   $('#exName').textContent=t.name;$('#exArea').textContent=t.area;
   $('#exFacts').innerHTML=`<div><b>${t.days}</b><span>Days</span></div><div><b>${fmt(t.max)}</b><span>Max m</span></div><div><b>$${fmt(t.price)}</b><span>From</span></div>`;
   const ol=$('#days');ol.innerHTML='';const sel=$('#mDay');sel.innerHTML='';
@@ -139,7 +139,7 @@ const VM=(()=>{
     v.addEventListener('playing',()=>c.classList.add('playing'),{once:true});m.appendChild(v);return c._v=v;}
   function apply(){
     const cy=innerHeight/2,dist=c=>{const r=c.getBoundingClientRect();return Math.abs(r.top+r.height/2-cy);};
-    const on=AUTO?[...vis].filter(c=>c.isConnected).sort((a,b)=>dist(a)-dist(b)).slice(0,small()?2:6):[];
+    const on=AUTO?[...vis].filter(c=>c.isConnected).sort((a,b)=>dist(a)-dist(b)).slice(0,small()?1:3):[];
     if(hov&&!on.includes(hov))on.push(hov);
     const W=new Set(on);
     for(const c of all){
@@ -321,8 +321,9 @@ function heroReel(){
   const src=n=>`assets/vh/${n}${small()?'-m':''}.mp4`;
   v0.classList.add('reel','on');
   const mk=()=>{const v=document.createElement('video');v.muted=true;v.loop=true;v.playsInline=true;v.setAttribute('playsinline','');v.preload='auto';v.className='reel';v.setAttribute('aria-hidden','true');media.appendChild(v);return v;};
+  if(small()||(navigator.connection&&/(^|-)[23]g$/.test(navigator.connection.effectiveType||'')))return; // phones keep one film: less data, smoother scrolling
   let cur=v0,nxt=mk(),i=0;
-  setTimeout(()=>{nxt.src=src(L[1]);},2500);
+  setTimeout(()=>{nxt.src=src(L[1]);},6000);
   const vis=()=>!document.hidden&&scrollY<innerHeight*1.1;
   addEventListener('scroll',()=>{if(vis()){if(cur.paused)cur.play().catch(()=>{});}else if(!cur.paused)cur.pause();},{passive:true});
   setInterval(()=>{

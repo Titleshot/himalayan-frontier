@@ -46,10 +46,7 @@
   <section class="hero" id="hero" aria-label="Introduction">
     <div class="hero-media" id="heroMedia">
       <img class="poster" src="assets/img/hero-bg.jpg" alt="">
-      <video id="heroVid" autoplay muted loop playsinline preload="auto" poster="assets/img/hero-bg.jpg">
-        <source src="assets/vh/hero-bg-m.mp4" type="video/mp4" media="(max-width: 700px)">
-        <source src="assets/vh/hero-bg.mp4" type="video/mp4">
-      </video>
+      <video id="heroVid" autoplay muted loop playsinline preload="auto" poster="assets/img/hero-bg.jpg"></video><script>(function(v){v.src=innerWidth<=700?'assets/vh/hero-bg-m.mp4':'assets/vh/hero-bg.mp4';})(document.getElementById('heroVid'));</script>
     </div>
     <div class="hero-in">
       <div class="hero-copy" id="heroCopy">
@@ -102,7 +99,7 @@
   <section id="explore" aria-label="3D trek explorer">
     <div class="wrap ex-head">
       <div><div class="eyebrow" style="margin-bottom:14px">3D route explorer</div><h2 class="h2">Walk a trek, day by day</h2></div>
-      <p>Sentinel-2 satellite imagery on real elevation data. Pick one of the five signature treks, then scroll and the map walks you along the trail, day by day. Press Play to let it walk on its own, or skip ahead any time.</p>
+      <p>Real satellite imagery on real mountains. Choose one of five signature treks and start the walk: scrolling then carries you along the trail day by day. Press Play to let it walk on its own, or skip it any time.</p>
     </div>
     <div class="wrap" style="padding-bottom:18px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap">
       <div class="tabs" role="tablist" aria-label="Choose a trek" id="tabs"></div>
@@ -129,7 +126,7 @@
             <div class="labels" id="labels" aria-hidden="true"></div>
             <div class="sprog" id="sprog"></div>
             <div class="hint" id="hint">Scroll to walk · drag to look around</div>
-            <div class="ex-cta" id="exCta"><div class="k" id="ctaK"></div><div class="row"><button class="btn btn-glow" type="button" id="ctaPlay"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg>Play the walk</button><button class="btn btn-line" type="button" id="ctaWalk">Skip to the itinerary</button></div><div class="ctreks" id="ctaTreks" role="group" aria-label="Or choose another trek"></div><small class="scue"><i aria-hidden="true"></i>Scroll to walk: each scroll takes you one day further.</small></div>
+            <div class="ex-cta" id="exCta"><div class="k">Choose a trek to walk</div><div class="ctreks" id="ctaTreks" role="group" aria-label="Choose a trek"></div><div class="ck" id="ctaK"></div><div class="row"><button class="btn btn-glow" type="button" id="ctaPlay"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg>Start the walk</button><button class="btn btn-line" type="button" id="ctaWalk">Skip to the itinerary</button></div><small class="scue"><i aria-hidden="true"></i>Once you start, scrolling walks the trail day by day.</small></div>
             <div class="attr" id="attr">Imagery: Copernicus Sentinel-2, November 2023<span class="long"> · Contains modified Copernicus Sentinel data 2023</span></div>
             <div class="ctrl tr">
               <button class="cbtn" id="bPlay"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M4 2.5v11l9-5.5z"/></svg><span>Play</span></button>
@@ -510,13 +507,13 @@
       <div class="fcol"><h4>Explore</h4><nav class="flinks" aria-label="Footer"><a href="#trips">All trips</a><a href="#where">Nepal map</a><a href="#explore">3D trek walk</a><a href="#departures">Group departures</a><a href="#hub">Plan your trip</a><a href="#booking">Booking</a><a href="#faq">FAQ</a></nav><div class="fsocial" id="fSocial"></div></div>
     </div>
     <div class="flegal"><span>© <span id="fYear"></span> <span data-cfg="company"></span></span><nav aria-label="Legal"><button type="button" data-legal="terms">Booking terms</button><button type="button" data-legal="cancel">Cancellation policy</button><button type="button" data-legal="privacy">Privacy policy</button></nav></div>
-    <p class="credit">3D terrain from SRTM / NASADEM elevation data (Mapzen Terrarium tiles, AWS Open Data), about 35–120 m per sample; route maps shown at 1.25× height, Nepal overview at 1.7×. Route-map imagery: single cloud-free Copernicus Sentinel-2 L2A scenes from 13 and 16 November 2023 (contains modified Copernicus Sentinel data 2023, via the AWS Open Data Sentinel-2 COG archive). Nepal overview imagery: Sentinel-2 cloudless 2016 by EOX IT Services GmbH (contains modified Copernicus Sentinel data 2016), licensed CC BY 4.0; cloud gaps filled from nearby ground. Borders and rivers: Natural Earth. Routes follow the terrain between real village coordinates. Altitudes in the text are the commonly published figures. Permit, visa and royalty fees are indicative; confirm before travel.</p>
+    <p class="credit">Satellite imagery contains modified Copernicus Sentinel data (2016, 2023); Sentinel-2 cloudless by EOX IT Services GmbH, CC BY 4.0. Borders and rivers: Natural Earth. Altitudes are the commonly published figures. Permit, visa and royalty fees are indicative; confirm before travel.</p>
   </div>
 </footer>
 <a class="wa" id="waBtn" href="#" target="_blank" rel="noopener" hidden aria-label="Chat on WhatsApp"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2Zm0 18.2c-1.5 0-3-.4-4.3-1.2l-.3-.2-3 .8.8-2.9-.2-.3A8.2 8.2 0 1 1 12 20.2Zm4.5-6.1c-.2-.1-1.5-.7-1.7-.8-.2-.1-.4-.1-.6.1l-.8 1c-.1.2-.3.2-.5.1a6.7 6.7 0 0 1-3.3-2.9c-.3-.4.2-.4.7-1.4.1-.2 0-.3 0-.4l-.8-1.8c-.2-.5-.4-.4-.6-.4h-.5c-.2 0-.4.1-.6.3-.2.2-.8.8-.8 2s.8 2.3.9 2.5c.1.2 1.6 2.5 4 3.5 1.5.6 2 .7 2.8.6.4-.1 1.5-.6 1.7-1.2.2-.6.2-1.1.1-1.2l-.5-.2Z"/></svg><span>WhatsApp</span></a>
 <dialog class="legal-dlg" id="legalDlg" aria-labelledby="legalTitle"><div class="legal-in"><button class="dlg-x" type="button" data-close aria-label="Close">×</button><div id="legalBody"></div></div></dialog>
 
-<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.min.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <script src="site-config.js"></script>
 <script src="app.js"></script>
 <script src="company.js"></script>
