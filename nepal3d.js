@@ -183,7 +183,7 @@ function showTip(C){
     ${rest.length?`<div class="tmore"><small>Also from here</small>${rest.map(c=>`<button type="button" class="trow" data-open="${c.id}"${ROUTES[c.id]?` data-hover="${c.id}"`:''}><i style="background:${COL[c.type]}"></i><span>${esc(c.name)}</span><em>${esc(c.dur)}</em></button>`).join('')}</div>`:''}
     ${L.length>4?`<button class="btn btn-line" type="button" data-more style="width:100%">See all ${L.length} trips here</button>`:''}</div>`;
   const tvv=tip.querySelector('.tv video');if(tvv)tvv.addEventListener('playing',()=>{tvv.style.opacity=1;});
-  tip.hidden=false;placeTip();
+  clearTimeout(tipOutT);const fresh=tip.hidden;tip.hidden=false;placeTip();if(fresh){tip.classList.remove('in');void tip.offsetWidth;}tip.classList.add('in');
   const first=L.find(c=>ROUTES[c.id]);if(first)showRoute(first.id,!!pinned);
   tip.querySelectorAll('[data-hover]').forEach(el=>{const id=el.dataset.hover;el.addEventListener('mouseenter',()=>showRoute(id,!!pinned));el.addEventListener('focusin',()=>showRoute(id,!!pinned));});
   tip.querySelectorAll('[data-route]').forEach(b=>b.addEventListener('click',e=>{e.stopPropagation();showRoute(b.dataset.route,true);}));
@@ -204,7 +204,9 @@ function placeTip(){
   tip.style.transform=`translate(${x.toFixed(0)}px,${y.toFixed(0)}px)`;
 }
 function hideSoon(){clearTimeout(hideT);hideT=setTimeout(()=>{if(!pinned){closeTip();if(!pinnedRoute)clearRoute();}},400);}
-function closeTip(){pinned=null;tipC=null;tip.hidden=true;tip.querySelectorAll('video').forEach(v=>v.pause());}
+let tipOutT=0;
+// the card fades out instead of vanishing, so the map underneath is revealed smoothly
+function closeTip(){pinned=null;tipC=null;tip.classList.remove('in');clearTimeout(tipOutT);tipOutT=setTimeout(()=>{if(!tipC){tip.hidden=true;tip.querySelectorAll('video').forEach(v=>v.pause());}},reduce?0:240);}
 tip.addEventListener('mouseenter',()=>clearTimeout(hideT));
 tip.addEventListener('mouseleave',()=>{if(!pinned)hideSoon();});
 stage.addEventListener('click',e=>{if(!tip.contains(e.target)&&!e.target.closest('.pin')&&!e.target.closest('.chip')&&!e.target.closest('.nback')){if(ptr.moved)return;closeTip();clearRoute();}});
