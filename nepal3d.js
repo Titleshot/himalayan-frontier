@@ -332,9 +332,9 @@ function want0(now){
     return {pol:.98,rad:asp<1?16:12,az:flyer?flyer.hd+user.az:cam.az,tx:p.x,tz:p.z,ty:p.y};
   }
   return {
-    pol:lerp(lerp(.1,.9,k),Math.max(.62,lerp(.1,.9,k)),fw),
-    rad:lerp(lerp(asp<1?118:80,asp<1?74:58,k),focus.rad,fw),
-    az:lerp(-.12,-.3,k)+user.az+(reduce?0:Math.sin(drift(now)/14000)*.04),
+    pol:lerp(lerp(.1,asp<1?.82:.9,k),Math.max(.62,lerp(.1,.9,k)),fw),
+    rad:lerp(lerp(asp<1?118:80,asp<1?90:58,k),focus.rad,fw),
+    az:lerp(-.12,asp<1?-1.15:-.3,k)+user.az+(reduce?0:Math.sin(drift(now)/14000)*.04),
     tx:lerp(lerp(0,asp<1?2:1,k),focus.cx,fw), tz:lerp(lerp(0,-3.5,k),focus.cz+(asp<1?2:1.5),fw)
   };
   return {

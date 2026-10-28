@@ -244,9 +244,10 @@ function sphere(){
     if(drag.touch&&!drag.lock&&drag.moved>10){const ax=Math.abs(e.clientX-drag.x),ay=Math.abs(e.clientY-drag.y);if(ay>ax*1.15){drag=null;return;}drag.lock='x';try{stage.setPointerCapture(e.pointerId);}catch(_){}}
     if(drag.touch&&!drag.lock)return;
     dragX+=dx*.13;dragY=clamp(dragY-dy*.13,-pl-tilt,pl-tilt);vX=dx*.13;vY=-dy*.13;drag.lx=e.clientX;drag.ly=e.clientY;idle=0;});
-  const end=e=>{if(!drag||e.pointerId!==drag.id)return;const slop=drag.touch?14:6;if(drag.moved<slop&&drag.card)S.openTrip(drag.card.dataset.trip);if(performance.now()-drag.t>120&&drag.moved<3){vX=vY=0;}drag=null;cursorDown(false);};
+  let dragged=false;
+  stage.addEventListener('click',e=>{if(dragged){dragged=false;return;}const c=e.target.closest('.sc');if(c)S.openTrip(c.dataset.trip);});
+  const end=e=>{if(!drag||e.pointerId!==drag.id)return;const slop=drag.touch?14:6;dragged=drag.moved>=slop;if(performance.now()-drag.t>120&&drag.moved<3){vX=vY=0;}drag=null;cursorDown(false);};
   stage.addEventListener('pointerup',end);stage.addEventListener('pointercancel',e=>{drag=null;cursorDown(false);});
-  stage.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){const c=e.target.closest('.sc');if(c){e.preventDefault();S.openTrip(c.dataset.trip);}}});
   cursorFor(stage,'Drag');
   const M=new DOMMatrix();
   function loop(){
@@ -329,7 +330,9 @@ function reel(){
     if(drag.touch&&!drag.lock&&drag.moved>10){if(Math.abs(e.clientY-drag.y)>Math.abs(e.clientX-drag.x)*1.15){drag=null;cursorDown(false);return;}drag.lock='x';try{cv.setPointerCapture(e.pointerId);}catch(_){}}
     if(drag.touch&&!drag.lock)return;
     const now=performance.now(),dx=(e.clientX-drag.lx)/u;off-=dx;drag.v=-dx/Math.max(.008,(now-drag.t)/1000);drag.t=now;drag.lx=e.clientX;});
-  const up=e=>{if(!drag||e.pointerId!==drag.id)return;if(drag.moved<(drag.touch?14:6)){const i=hit(e);if(i>=0)S.openTrip(REEL[i][0]);}else vel=clamp(drag.v,-3000,3000);drag=null;cursorDown(false);};
+  let dragged=false;
+  const up=e=>{if(!drag||e.pointerId!==drag.id)return;dragged=drag.moved>=(drag.touch?14:6);if(dragged)vel=clamp(drag.v,-3000,3000);drag=null;cursorDown(false);};
+  cv.addEventListener('click',e=>{if(dragged){dragged=false;return;}const i=hit(e);if(i>=0)S.openTrip(REEL[i][0]);});
   cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',()=>{drag=null;cursorDown(false);});
   cv.style.touchAction='pan-y';
   // keyboard and screen readers get a plain list of the same films
